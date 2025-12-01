@@ -70,6 +70,10 @@ class TopdownPoseEstimator(BasePoseEstimator):
         losses = dict()
 
         if self.with_head:
+
+            shape_data = [
+                d.gt_instance_labels.keypoint_x_labels.shape for d in data_samples
+            ]
             losses.update(
                 self.head.loss(feats, data_samples, train_cfg=self.train_cfg))
 

@@ -2977,7 +2977,7 @@
       "image_id": 1,
       "category_id": 1,
       "segmentation": [],
-      "num_keypoints": 13,
+      "num_keypoints": 133,
       "area": 475603.06,
       "bbox": [
         516.15,
@@ -3749,7 +3749,7 @@
       "image_id": 2,
       "category_id": 1,
       "segmentation": [],
-      "num_keypoints": 10,
+      "num_keypoints": 133,
       "area": 470718.63,
       "bbox": [
         609.77,

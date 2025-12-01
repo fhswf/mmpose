@@ -1059,13 +1059,17 @@ class GenerateTarget(BaseTransform):
                 encoded['label_mapping_table'] = _label_mapping_table
 
         if self.use_dataset_keypoint_weights and 'keypoint_weights' in encoded:
+            print("keypoint_weights: ", encoded['keypoint_weights'], results['dataset_keypoint_weights'])
+
             if isinstance(encoded['keypoint_weights'], list):
                 for w in encoded['keypoint_weights']:
+                    print("w has length ", w)
                     w = w * results['dataset_keypoint_weights']
             else:
                 encoded['keypoint_weights'] = encoded[
                     'keypoint_weights'] * results['dataset_keypoint_weights']
 
+            print("survived")
         results.update(encoded)
 
         return results

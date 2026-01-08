@@ -1,7 +1,7 @@
 _base_ = ['./_base_/default_runtime.py']
 
 # common setting
-num_keypoints = 249
+num_keypoints = 133
 input_size = (288, 384)
 
 # runtime
@@ -66,8 +66,8 @@ model = dict(
         type='CSPNeXt',
         arch='P5',
         expand_ratio=0.5,
-        deepen_factor=1.33,
-        widen_factor=1.25,
+        deepen_factor=1.0,
+        widen_factor=1.0,
         channel_attention=True,
         norm_cfg=dict(type='BN'),
         act_cfg=dict(type='SiLU'),
@@ -79,7 +79,7 @@ model = dict(
         )),
     neck=dict(
         type='CSPNeXtPAFPN',
-        in_channels=[320, 640, 1280],
+        in_channels=[256, 512, 1024],
         out_channels=None,
         out_indices=(
             1,
@@ -91,7 +91,7 @@ model = dict(
         act_cfg=dict(type='SiLU', inplace=True)),
     head=dict(
         type='RTMWHead',
-        in_channels=1280,
+        in_channels=1024,
         out_channels=num_keypoints,
         input_size=input_size,
         in_featuremap_size=tuple([s // 32 for s in input_size]),
@@ -125,10 +125,18 @@ data_root = 'data/'
 
 backend_args = dict(backend='local')
 
+import mmpose.utils.custom_transforms
+
+fix_coco133 = [(i, i) for i in range(133)]
+
 # pipelines
 train_pipeline = [
     dict(type='LoadImage', backend_args=backend_args),
     dict(type='GetBBoxCenterScale'),
+    dict(
+        type='SafeKeypointConverter',
+        num_keypoints=133,
+        mapping=fix_coco133),
 #    dict(type='RandomFlip', direction='horizontal'),
 #    dict(type='RandomHalfBody'),
 #    dict(
@@ -159,12 +167,20 @@ train_pipeline = [
 val_pipeline = [
     dict(type='LoadImage', backend_args=backend_args),
     dict(type='GetBBoxCenterScale'),
+    dict(
+        type='SafeKeypointConverter',
+        num_keypoints=133,
+        mapping=fix_coco133),
     dict(type='TopdownAffine', input_size=codec['input_size']),
     dict(type='PackPoseInputs')
 ]
 train_pipeline_stage2 = [
     dict(type='LoadImage', backend_args=backend_args),
     dict(type='GetBBoxCenterScale'),
+    dict(
+        type='SafeKeypointConverter',
+        num_keypoints=133,
+        mapping=fix_coco133),
     #dict(type='RandomFlip', direction='horizontal'),
     #dict(type='RandomHalfBody'),
     #dict(
@@ -338,9 +354,11 @@ custom_hooks = [
         switch_pipeline=train_pipeline_stage2)
 ]
 
+import mmpose.utils.custom_metrics
+
 # evaluators
 val_evaluator = dict(
-    type='CocoWholeBodyMetric',
+    type='SafeCocoWholeBodyMetric',
     ann_file='data/coco/annotations/coco_wholebody_val.json')
 test_evaluator = val_evaluator
 

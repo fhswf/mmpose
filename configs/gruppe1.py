@@ -8,7 +8,7 @@ input_size = (288, 384)
 max_epochs = 100
 stage2_num_epochs = 10
 base_lr = 5e-5
-train_batch_size = 320
+train_batch_size = 32
 val_batch_size = 32
 
 train_cfg = dict(max_epochs=max_epochs, val_interval=10)
@@ -66,8 +66,8 @@ model = dict(
         type='CSPNeXt',
         arch='P5',
         expand_ratio=0.5,
-        deepen_factor=1.33,
-        widen_factor=1.25,
+        deepen_factor=1.0,
+        widen_factor=1.0,
         channel_attention=True,
         norm_cfg=dict(type='BN'),
         act_cfg=dict(type='SiLU'),
@@ -79,7 +79,7 @@ model = dict(
         )),
     neck=dict(
         type='CSPNeXtPAFPN',
-        in_channels=[320, 640, 1280],
+        in_channels=[256, 512, 1024],
         out_channels=None,
         out_indices=(
             1,
@@ -91,7 +91,7 @@ model = dict(
         act_cfg=dict(type='SiLU', inplace=True)),
     head=dict(
         type='RTMWHead',
-        in_channels=1280,
+        in_channels=1024,
         out_channels=num_keypoints,
         input_size=input_size,
         in_featuremap_size=tuple([s // 32 for s in input_size]),
@@ -116,7 +116,7 @@ model = dict(
             mask_weight=0.5,
         ),
         decoder=codec),
-    test_cfg=dict(flip_test=True))
+    test_cfg=dict(flip_test=False))
 
 # base dataset settings
 dataset_type = 'CocoWholeBodyDataset'
@@ -125,64 +125,80 @@ data_root = 'data/'
 
 backend_args = dict(backend='local')
 
+import mmpose.utils.custom_transforms
+
+fix_coco133 = [(i, i) for i in range(133)]
+
 # pipelines
 train_pipeline = [
     dict(type='LoadImage', backend_args=backend_args),
     dict(type='GetBBoxCenterScale'),
-    dict(type='RandomFlip', direction='horizontal'),
-    dict(type='RandomHalfBody'),
     dict(
-        type='RandomBBoxTransform', scale_factor=[0.5, 1.5], rotate_factor=90),
+        type='SafeKeypointConverter',
+        num_keypoints=133,
+        mapping=fix_coco133),
+#    dict(type='RandomFlip', direction='horizontal'),
+#    dict(type='RandomHalfBody'),
+#    dict(
+#        type='RandomBBoxTransform', scale_factor=[0.5, 1.5], rotate_factor=90),
     dict(type='TopdownAffine', input_size=codec['input_size']),
-    dict(type='PhotometricDistortion'),
-    dict(
-        type='Albumentation',
-        transforms=[
-            dict(type='Blur', p=0.1),
-            dict(type='MedianBlur', p=0.1),
-            dict(
-                type='CoarseDropout',
-                max_holes=1,
-                max_height=0.4,
-                max_width=0.4,
-                min_holes=1,
-                min_height=0.2,
-                min_width=0.2,
-                p=0.5),
-        ]),
+#    dict(type='PhotometricDistortion'),
+#    dict(
+#        type='Albumentation',
+#        transforms=[
+#            dict(type='Blur', p=0.1),
+#            dict(type='MedianBlur', p=0.1),
+#            dict(
+#                type='CoarseDropout',
+#                max_holes=1,
+#                max_height=0.4,
+#                max_width=0.4,
+#                min_holes=1,
+#                min_height=0.2,
+#                min_width=0.2,
+#                p=0.5),
+#        ]),
     dict(
         type='GenerateTarget',
         encoder=codec,
-        use_dataset_keypoint_weights=True),
+        use_dataset_keypoint_weights=False),
     dict(type='PackPoseInputs')
 ]
 val_pipeline = [
     dict(type='LoadImage', backend_args=backend_args),
     dict(type='GetBBoxCenterScale'),
+    dict(
+        type='SafeKeypointConverter',
+        num_keypoints=133,
+        mapping=fix_coco133),
     dict(type='TopdownAffine', input_size=codec['input_size']),
     dict(type='PackPoseInputs')
 ]
 train_pipeline_stage2 = [
     dict(type='LoadImage', backend_args=backend_args),
     dict(type='GetBBoxCenterScale'),
-    dict(type='RandomFlip', direction='horizontal'),
-    dict(type='RandomHalfBody'),
     dict(
-        type='RandomBBoxTransform',
-        shift_factor=0.,
-        scale_factor=[0.5, 1.5],
-        rotate_factor=90),
+        type='SafeKeypointConverter',
+        num_keypoints=133,
+        mapping=fix_coco133),
+    #dict(type='RandomFlip', direction='horizontal'),
+    #dict(type='RandomHalfBody'),
+    #dict(
+    #    type='RandomBBoxTransform',
+    #    shift_factor=0.,
+    #    scale_factor=[0.5, 1.5],
+    #    rotate_factor=90),
     dict(type='TopdownAffine', input_size=codec['input_size']),
-    dict(
-        type='Albumentation',
-        transforms=[
-            dict(type='Blur', p=0.1),
-            dict(type='MedianBlur', p=0.1),
-        ]),
+    #dict(
+    #    type='Albumentation',
+    #    transforms=[
+    #        dict(type='Blur', p=0.1),
+    #        dict(type='MedianBlur', p=0.1),
+    #    ]),
     dict(
         type='GenerateTarget',
         encoder=codec,
-        use_dataset_keypoint_weights=True),
+        use_dataset_keypoint_weights=False),
     dict(type='PackPoseInputs')
 ]
 
@@ -252,14 +268,14 @@ humanart_coco133 = [(i, i) for i in range(17)] + [(17, 99), (18, 120),
                                                   (19, 17), (20, 20)]
 
 # train datasets
-dataset_coco = dict(
-    type=dataset_type,
-    data_root=data_root,
-    data_mode=data_mode,
-    ann_file='coco/annotations/person_keypoints.json',
-    data_prefix=dict(img='coco/images'),
-    pipeline=[],
-)
+#dataset_coco = dict(
+#    type=dataset_type,
+#    data_root=data_root,
+#    data_mode=data_mode,
+#    ann_file='coco/annotations/coco_wholebody_train.json',
+#    data_prefix=dict(img='coco/images'),
+#    pipeline=[],
+#)
 
 hand_pipeline = [
     dict(type='LoadImage', backend_args=backend_args),
@@ -280,15 +296,15 @@ interhand_coco133 = interhand_right + interhand_left
 
 
 
-dataset_hand = dict(
-    type='CombinedDataset',
-    metainfo=dict(from_file='configs/_base_/datasets/coco_wholebody.py'),
-    datasets=[dataset_coco],
-    pipeline=[],
-    test_mode=False,
-)
+#dataset_hand = dict(
+#    type='CombinedDataset',
+#    metainfo=dict(from_file='configs/_base_/datasets/coco_wholebody.py'),
+#    datasets=[dataset_coco],
+#    pipeline=[],
+#    test_mode=False,
+#)
 
-train_datasets = [dataset_hand]
+#train_datasets = [dataset_hand]
 
 # data loaders
 train_dataloader = dict(
@@ -296,11 +312,11 @@ train_dataloader = dict(
     num_workers=4,
     pin_memory=False,
     persistent_workers=True,
-    sampler=dict(type='DefaultSampler', shuffle=True),
+    sampler=dict(type='DefaultSampler', shuffle=False),
     dataset=dict(
-        type='CombinedDataset',
-        metainfo=dict(from_file='configs/_base_/datasets/coco_wholebody.py'),
-        datasets=train_datasets,
+        type='CocoWholeBodyDataset',
+        ann_file='data/coco/annotations/coco_wholebody_train.json',
+        data_prefix=dict(img='data/coco/images'),
         pipeline=train_pipeline,
         test_mode=False,
     ))
@@ -313,7 +329,7 @@ val_dataloader = dict(
     sampler=dict(type='DefaultSampler', shuffle=False, round_up=False),
     dataset=dict(
         type='CocoWholeBodyDataset',
-        ann_file='data/coco/annotations/person_keypoints.json',
+        ann_file='data/coco/annotations/coco_wholebody_val.json',
         data_prefix=dict(img='data/coco/images'),
         pipeline=val_pipeline,
         test_mode=True))
@@ -338,11 +354,14 @@ custom_hooks = [
         switch_pipeline=train_pipeline_stage2)
 ]
 
+import mmpose.utils.custom_metrics
+
 # evaluators
 val_evaluator = dict(
-    type='CocoWholeBodyMetric',
-    ann_file='data/coco/annotations/person_keypoints.json')
+    type='SafeCocoWholeBodyMetric',
+    ann_file='data/coco/annotations/coco_wholebody_val.json')
 test_evaluator = val_evaluator
 
-
-load_from = "https://download.openmmlab.com/mmpose/v1/projects/rtmw/rtmw-x_simcc-cocktail14_pt-ucoco_270e-384x288-f840f204_20231122.pth"
+load_from  = "https://download.openmmlab.com/mmpose/v1/projects/rtmw/rtmw-dw-x-l_simcc-cocktail14_270e-384x288-20231122.pth"
+#load_from = "https://download.openmmlab.com/mmpose/v1/projects/rtmw/rtmw-x_simcc-cocktail14_pt-ucoco_270e-384x288-f840f204_20231122.pth"
+#load_from = "https://download.openmmlab.com/mmpose/v1/projects/rtmpose/rtmpose-x_simcc-body7_pt-body7_420e-384x288-3fbea3f2_20230731.pth"
